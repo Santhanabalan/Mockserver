@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openapi-spec-config
+  namespace: default
+data:
+  payment-gateway-openapi.yaml: |
+    openapi: 3.0.2
+    info:
+      title: Payment Gateway API
+      version: 1.0.0
+    components:
+      schemas:
+        Payment:
+          allOf:
+            - $ref: "#/components/schemas/NewPayment"
+            - properties:
+                transactionId:
+                  format: string
+                  type: string
+              required:
+                - transactionId
+        NewPayment:
+          properties:
+            orderId:
+              type: string
+            amount:
+              type: number
+          required:
+            - orderId
+            - amount
+
+    paths:
+      /processPayment:
+        post:
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/NewPayment"
+                examples:
+                  new_payment:
+                    value:
+                      orderId: "123"
+                      amount: 100.00
+          responses:
+            "201":
+              description: Payment processed successfully
+              content:
+                application/json:
+                  schema:
+                    $ref: "#/components/schemas/Payment"
+                  examples:
+                    payment_success:
+                      value: |-
+                        {
+                          "transactionId": "{{ randomUUID() }}",
+                          "orderId": "{{ request.body/orderId }}",
+                          "amount": "{{ request.body/amount }}",
+                          "status": "success"
+                        }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: upload-openapi-spec
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+      - name: upload-spec
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Waiting for Microcks to be available...";
+            until curl --output /dev/null --silent --head --fail http://mockserver/; do
+              printf '.';
+              sleep 5;
+            done;
+            echo "Uploading OpenAPI spec...";
+            curl -X POST "http://mockserver/api/artifact/upload?mainArtifact=true" \
+            -F "file=@/workspace/payment-gateway-openapi.yaml" \
+            -F "mainArtifact=true";
+        volumeMounts:
+        - name: openapi-spec-volume
+          mountPath: /workspace
+      restartPolicy: OnFailure
+      volumes:
+      - name: openapi-spec-volume
+        configMap:
+          name: openapi-spec-config
+  backoffLimit: 3
