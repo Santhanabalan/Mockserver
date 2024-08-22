@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-service-ft
+  namespace: default
+spec:
+  containers:
+  - name: curl
+    image: curlimages/curl:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - >
+        response=$(curl -s -o response.txt -w "%{http_code}" -X POST http://order-service/createOrder
+        -H "Content-Type: application/json"
+        -d '{"orderId": "12345", "amount": 99.99}');
+        
+        if [ "$response" -eq 200 ]; then
+          echo "Test Passed: HTTP Status 200 OK";
+          echo "Test Passed: Order confirmed";
+        else
+          echo "Test Failed: Unexpected HTTP Status $response";
+        fi;
+        
+        echo "----------------------------------------";
+        echo "Response:";
+        cat response.txt;
+        echo "----------------------------------------";
+        
+        sleep 3600; # Keep the pod running for 1 hour
+  restartPolicy: Never
