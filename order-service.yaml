@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: santhanabalanv/order-service:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: PAYMENT_SERVICE_URL
+          value: "http://mockserver/rest/Payment+Gateway+API/1.0.0/processPayment"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
